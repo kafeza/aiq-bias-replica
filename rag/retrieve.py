@@ -20,7 +20,7 @@ from pymilvus import MilvusClient
 from transformers import AutoModel, AutoModelForSequenceClassification, AutoTokenizer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DB = os.path.join(HERE, "milvus.db")
+DB = os.getenv("MILVUS_DB", os.path.join(HERE, "milvus.db"))   # Dhabi: one copy per lane
 EMBED = "nvidia/llama-nemotron-embed-1b-v2"
 RERANK = "nvidia/llama-nemotron-rerank-1b-v2"
 VECTOR_DB_TOPK, RETRIEVER_TOPK, RERANK_BATCH = 100, 10, 16

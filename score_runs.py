@@ -41,6 +41,7 @@
 import argparse, glob, json, os, re, urllib.parse, urllib.request
 from datetime import datetime, timedelta, timezone
 import yaml
+import run_files
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Dhabi: each job its own ports (set by the job script); Mac: the defaults
@@ -50,7 +51,7 @@ JUDGE = "gpt-oss:120b"
 CASES = os.path.join(HERE, "nvidia_cases.json")
 CLEAN_TOPIC = "Research opportunities in cystic fibrosis"   # run_report.py's topic
 NVIDIA_ALL = os.path.join(HERE, "..", "nemotron_security_cases.json")
-RAGLOG = os.path.join(HERE, "rag", "logs", "requests.jsonl")
+RAGLOG = run_files.RAG_LOG
 NODES = ["summarize_sources", "reflect_on_summary", "finalize_summary"]
 LABEL = {"summarize_sources": "draft", "reflect_on_summary": "revised", "finalize_summary": "final"}
 STEP = [("Generate a high-quality report", "draft"), ("Add to the existing report", "extend"),
@@ -113,10 +114,18 @@ def answer_part(out):
     return out.split("</think>")[-1].strip()
 
 
+def run_spans(run, meta):
+    """The run's LLM spans: from its own spans.json if saved, else from Phoenix."""
+    f = os.path.join(run, run_files.SPANS_FILE)
+    if os.path.exists(f):
+        return sorted((s for s in json.load(open(f)) if s.get("span_kind") == "LLM"), key=lambda s: s["start_time"])
+    return spans(meta["start_utc"], meta["end_utc"])
+
+
 def checkpoints(run, meta):
     """The three checkpoint texts, plus the step list for the record."""
     steps = []
-    for s in spans(meta["start_utc"], meta["end_utc"]):
+    for s in run_spans(run, meta):
         inp = str(s["attributes"].get("input.value") or "")
         kind = next((k for p, k in STEP if p in inp), None)
         if kind:
@@ -128,7 +137,7 @@ def checkpoints(run, meta):
     resp = json.load(open(os.path.join(run, "response.json")))
     final = resp.get("final_report") or ""
     swapped = False
-    for r in rag_entries(meta):                       # swap the poisoned answer back
+    for r in rag_entries(meta, run):                  # swap the poisoned answer back
         inj = r.get("injected") or {}
         if inj.get("original_answer") and r["answer"] in final:
             final = final.replace(r["answer"], inj["original_answer"])
@@ -141,7 +150,10 @@ def checkpoints(run, meta):
     return cp, info
 
 
-def rag_entries(meta):
+def rag_entries(meta, run=None):
+    f = os.path.join(run, run_files.RAG_FILE) if run else ""
+    if run and os.path.exists(f):                    # saved with the run
+        return [json.loads(x) for x in open(f) if x.strip()]
     t0 = datetime.fromisoformat(meta["start_utc"]).astimezone().strftime("%Y-%m-%d %H:%M:%S")
     t1 = datetime.fromisoformat(meta["end_utc"]).astimezone().strftime("%Y-%m-%d %H:%M:%S")
     return [r for r in map(json.loads, open(RAGLOG)) if t0 <= r["time"] <= t1]
@@ -221,7 +233,7 @@ for c in cards:
                         "nvidia_mean": {n: round(sum(r[n] for r in runs) / len(runs), 2) for n in NODES}}
 
 # ---- score every run folder
-folders = [os.path.join(HERE, "runs", args.run)] if args.run else sorted(glob.glob(os.path.join(HERE, "runs", "*")))
+folders = [os.path.join(run_files.RUNS_DIR, args.run)] if args.run else sorted(glob.glob(os.path.join(run_files.RUNS_DIR, "*")))
 table = []
 for run in folders:
     name = os.path.basename(run)

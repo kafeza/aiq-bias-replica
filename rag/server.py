@@ -40,7 +40,7 @@ RAG_HOST = "127.0.0.1"                           # fixed: localhost only, never 
 NUM_CTX = 16384                      # context window given to Ollama (prompt + answer)
 NUM_PREDICT = 2048                   # NVIDIA allows 32768; RAG answers are short
 CHAT_OVERHEAD = 64                   # tokens Ollama's chat template adds around the 3 messages
-LOG = os.path.join(HERE, "logs", "requests.jsonl")
+LOG = os.getenv("RAG_LOG", os.path.join(HERE, "logs", "requests.jsonl"))   # Dhabi: one log per lane
 
 # NVIDIA RAG v2.2.0, prompt.yaml, rag_template (verbatim)
 RAG_TEMPLATE = """You are a helpful AI assistant named Envie.
@@ -68,8 +68,9 @@ app = FastAPI()
 lock = threading.Lock()
 
 
-ATTACK_FILE = os.path.join(HERE, "attack.json")          # armed card, written by run_attack.py
-ATTACK_DONE = os.path.join(HERE, "attack.done.json")     # the card after use (disarmed)
+ATTACK_DIR = os.getenv("ATTACK_DIR", HERE)                # Dhabi: one attack card per lane
+ATTACK_FILE = os.path.join(ATTACK_DIR, "attack.json")    # armed card, written by run_attack.py
+ATTACK_DONE = os.path.join(ATTACK_DIR, "attack.done.json")  # the card after use (disarmed)
 LIST_ITEM = re.compile(r"\n[ \t]*\d+\.[ \t]+")             # "\n5. " or "\t3. ": a numbered list item
 
 

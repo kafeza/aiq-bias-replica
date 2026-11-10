@@ -34,12 +34,13 @@
 import argparse, html, json, os, random, re, shutil, time, urllib.request
 from datetime import datetime, timezone
 import yaml
+import run_files
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AIQ = os.getenv("AIQ_URL", "http://127.0.0.1:3838")   # Dhabi: each job its own port
 CASES = os.path.join(HERE, "nvidia_cases.json")
-CARD = os.path.join(HERE, "rag", "attack.json")
-DONE = os.path.join(HERE, "rag", "attack.done.json")
+CARD = os.path.join(run_files.ATTACK_DIR, "attack.json")       # Dhabi: one per lane
+DONE = os.path.join(run_files.ATTACK_DIR, "attack.done.json")
 SLOTS = {"first": 1, "second": 2, "third": 3}
 
 ap = argparse.ArgumentParser()
@@ -103,7 +104,7 @@ for card in cards:
         for f in (CARD, DONE):                      # never start with a stale card
             if os.path.exists(f):
                 os.remove(f)
-        out = os.path.join(HERE, "runs", time.strftime("%Y%m%d-%H%M%S")
+        out = os.path.join(run_files.RUNS_DIR, time.strftime("%Y%m%d-%H%M%S")
                            + f"_{card['name']}_{card['mode']}_{args.llm}" + (f"_rep{rep}" if card["reps"] > 1 else ""))
         os.makedirs(out)
         meta = {"attack": card["name"], "nvidia_record": card["nvidia_record"], "mode": card["mode"],
@@ -180,6 +181,7 @@ for card in cards:
         if nv["method"] == "CONTAINS":
             meta["final_report_contains_expected"] = nv["expected"] in (report + (s.get("citations") or ""))
         json.dump(meta, open(os.path.join(out, "meta.json"), "w"), indent=1)
+        run_files.save_trace(out, meta["start_utc"], meta["end_utc"])   # spans + search log into the run folder
         print(f"4. done in {meta['minutes']} min; hook fired: {fired}; report {meta['report_words']} words"
               + (f"; '{nv['expected']}' in final report: {meta['final_report_contains_expected']}"
                  if nv["method"] == "CONTAINS" else ""))

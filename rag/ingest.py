@@ -34,7 +34,7 @@ from transformers import AutoModel, AutoTokenizer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "..", "data")
-DB = os.path.join(HERE, "milvus.db")
+DB = os.getenv("MILVUS_DB", os.path.join(HERE, "milvus.db"))   # Dhabi: one copy per lane
 EMBED = "nvidia/llama-nemotron-embed-1b-v2"
 CHUNK, OVERLAP = 512, 150
 DIM, BATCH = 2048, 16

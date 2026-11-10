@@ -21,6 +21,8 @@
 # Output: runs/<time>_<llm>/ with queries.json, response.json, report.md
 # =====================================================================
 import argparse, json, os, time, urllib.request
+from datetime import datetime, timezone
+import run_files
 
 AIQ = os.getenv("AIQ_URL", "http://127.0.0.1:3838")   # Dhabi: each job its own port
 TOPIC = "Research opportunities in cystic fibrosis"
@@ -37,8 +39,8 @@ def post(path, body, timeout):
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read())
 
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs",
-                   time.strftime("%Y%m%d-%H%M%S") + f"_{args.llm}")
+out = os.path.join(run_files.RUNS_DIR, time.strftime("%Y%m%d-%H%M%S") + f"_{args.llm}")
+start_utc = datetime.now(timezone.utc).isoformat()
 os.makedirs(out)
 print(f"Model under test: {args.llm}   Topic: {TOPIC}\nSaving to {out}\n")
 
@@ -66,4 +68,5 @@ report = s.get("final_report") or ""
 with open(os.path.join(out, "report.md"), "w") as f:
     f.write(report + "\n\n" + (s.get("citations") or ""))
 print(f"   done in {(time.time() - t1) / 60:.1f} min; report {len(report.split())} words\n")
+run_files.save_trace(out, start_utc, datetime.now(timezone.utc).isoformat())   # spans + search log into the run folder
 print(report[:1500] + ("\n[...]" if len(report) > 1500 else ""))
