@@ -1,0 +1,17 @@
+# environments and NVIDIA's own code (aiq/ is NVIDIA's git repo)
+.venv*/
+aiq/
+__pycache__/
+# data, models, search database, outputs
+data/
+models/
+exports/
+logs/
+runs/
+rag/milvus.db
+rag/logs/
+rag/ingested_*.txt
+# armed/used attack cards (temporary, per run)
+rag/attack.json
+rag/attack.done.json
+.DS_Store
