@@ -31,7 +31,7 @@ Notes on rule 3:
 
 - Dhabi has no low-priority level (only QOS `normal`, no preemption), so we use
   `--nice` (others go first in the queue), a **time limit**, a fixed number of processors
-  and amount of memory, and **short jobs** (one batch of runs per job).
+  (memory cannot be requested: SLURM does not count it on node 18), and **short jobs** (one batch of runs per job).
 - If node 18 is busy, the job waits; it never moves to another node.
 
 ```bash
@@ -40,7 +40,7 @@ Notes on rule 3:
 #SBATCH --nice=1000
 #SBATCH --time=08:00:00
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+# no --mem line: SLURM does not count memory on node 18 (RealMemory=1), any --mem is refused
 ```
 
 ## What runs where (all inside one SLURM job)

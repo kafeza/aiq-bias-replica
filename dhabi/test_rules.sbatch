@@ -11,7 +11,6 @@
 #SBATCH --nice=1000
 #SBATCH --time=00:05:00
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=1G
 #SBATCH --output=test_rules_%j.log
 
 cd "$SLURM_SUBMIT_DIR" || exit 1
