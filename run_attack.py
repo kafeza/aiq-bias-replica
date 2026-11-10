@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-AIQ = "http://127.0.0.1:3838"
+AIQ = os.getenv("AIQ_URL", "http://127.0.0.1:3838")   # Dhabi: each job its own port
 CASES = os.path.join(HERE, "nvidia_cases.json")
 CARD = os.path.join(HERE, "rag", "attack.json")
 DONE = os.path.join(HERE, "rag", "attack.done.json")

@@ -38,7 +38,9 @@ DB = os.path.join(HERE, "milvus.db")
 EMBED = "nvidia/llama-nemotron-embed-1b-v2"
 CHUNK, OVERLAP = 512, 150
 DIM, BATCH = 2048, 16
-DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
+# NVIDIA GPU (Dhabi) if there is one, else the Mac GPU (mps), else the CPU
+DEVICE = ("cuda" if torch.cuda.is_available() else
+          "mps" if torch.backends.mps.is_available() else "cpu")
 
 ap = argparse.ArgumentParser()
 ap.add_argument("collections", nargs="+", choices=["Biomedical_Dataset", "Financial_Dataset"])

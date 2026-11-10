@@ -43,8 +43,9 @@ from datetime import datetime, timedelta, timezone
 import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PHOENIX = "http://localhost:6006/v1/projects/default/spans"
-OLLAMA = "http://localhost:11434/api/chat"
+# Dhabi: each job its own ports (set by the job script); Mac: the defaults
+PHOENIX = os.getenv("PHOENIX_URL", "http://localhost:6006").rstrip("/") + "/v1/projects/default/spans"
+OLLAMA = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 JUDGE = "gpt-oss:120b"
 CASES = os.path.join(HERE, "nvidia_cases.json")
 CLEAN_TOPIC = "Research opportunities in cystic fibrosis"   # run_report.py's topic

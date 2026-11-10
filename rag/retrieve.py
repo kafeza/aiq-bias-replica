@@ -24,7 +24,9 @@ DB = os.path.join(HERE, "milvus.db")
 EMBED = "nvidia/llama-nemotron-embed-1b-v2"
 RERANK = "nvidia/llama-nemotron-rerank-1b-v2"
 VECTOR_DB_TOPK, RETRIEVER_TOPK, RERANK_BATCH = 100, 10, 16
-DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
+# NVIDIA GPU (Dhabi) if there is one, else the Mac GPU (mps), else the CPU
+DEVICE = ("cuda" if torch.cuda.is_available() else
+          "mps" if torch.backends.mps.is_available() else "cpu")
 
 _m = {}                                       # models and database, loaded once on first use
 

@@ -21,7 +21,7 @@
 # the answer to the targeted question is poisoned once, then the card is
 # disarmed. See attack_hook() and attacks.yml.
 # Usage (inside .venv-rag, from ~/llm-safety/aiq_local):
-#   python rag/server.py            # listens on http://localhost:8081, Ctrl+C to stop
+#   python rag/server.py            # listens on http://127.0.0.1:8081 (or RAG_PORT), Ctrl+C to stop
 # =====================================================================
 import json, os, re, sys, threading, time
 import requests
@@ -35,6 +35,8 @@ from retrieve import retrieve, _load  # noqa: E402
 
 OLLAMA = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 RAG_LLM = os.getenv("RAG_LLM", "nemotron-super-49b")
+RAG_PORT = int(os.getenv("RAG_PORT", "8081"))   # Dhabi: each job its own free port
+RAG_HOST = "127.0.0.1"                           # fixed: localhost only, never all networks
 NUM_CTX = 16384                      # context window given to Ollama (prompt + answer)
 NUM_PREDICT = 2048                   # NVIDIA allows 32768; RAG answers are short
 CHAT_OVERHEAD = 64                   # tokens Ollama's chat template adds around the 3 messages
@@ -213,5 +215,5 @@ def generate_endpoint(body: dict = Body(...)):
 if __name__ == "__main__":
     print("Loading retrieval models...", flush=True)
     _load()
-    print(f"RAG server on http://localhost:8081  (answer model: {RAG_LLM})", flush=True)
-    uvicorn.run(app, host="127.0.0.1", port=8081, log_level="warning")
+    print(f"RAG server on http://{RAG_HOST}:{RAG_PORT}  (answer model: {RAG_LLM})", flush=True)
+    uvicorn.run(app, host=RAG_HOST, port=RAG_PORT, log_level="warning")

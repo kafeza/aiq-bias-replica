@@ -1,0 +1,16 @@
+--- a/phoenix/server/grpc_server.py	2026-11-10 11:32:21
++++ b/phoenix/server/grpc_server.py	2026-11-10 11:32:30
+@@ -104,9 +104,11 @@
+                 if isinstance(tls_config, TLSConfigVerifyClient)
+                 else grpc.ssl_server_credentials(private_key_certificate_chain_pairs)
+             )
+-            server.add_secure_port(f"[::]:{self._port}", server_credentials)
++            # LOCAL CHANGE (was [::] = all networks): listen on localhost only
++            server.add_secure_port(f"127.0.0.1:{self._port}", server_credentials)
+         else:
+-            server.add_insecure_port(f"[::]:{self._port}")
++            # LOCAL CHANGE (was [::] = all networks): listen on localhost only
++            server.add_insecure_port(f"127.0.0.1:{self._port}")
+         add_TraceServiceServicer_to_server(Servicer(self._enqueue_span), server)  # type: ignore[no-untyped-call,unused-ignore]
+         await server.start()
+         self._server = server

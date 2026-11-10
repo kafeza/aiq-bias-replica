@@ -22,7 +22,7 @@
 # =====================================================================
 import argparse, json, os, time, urllib.request
 
-AIQ = "http://127.0.0.1:3838"
+AIQ = os.getenv("AIQ_URL", "http://127.0.0.1:3838")   # Dhabi: each job its own port
 TOPIC = "Research opportunities in cystic fibrosis"
 ORGANIZATION = "Executive Summary: \n\n Current Trends: \n\n Challenges \n\n Research oportunities \n\n Conclusion"
 COLLECTION = "Biomedical_Dataset"
