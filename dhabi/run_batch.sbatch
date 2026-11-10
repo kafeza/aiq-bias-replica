@@ -84,7 +84,7 @@ echo "Starting $N lane(s), agent model $LLM ($ALIAS), tasks: $TASKS"
 declare -a AIQ_PORT PHX_PORT
 for k in $(seq 0 $((N - 1))); do
     LANE_DIR="$REPO/lanes/$SLURM_JOB_ID/L$k"; mkdir -p "$LANE_DIR/phoenix"
-    cp rag/milvus.db "$LANE_DIR/milvus.db"
+    cp -r rag/milvus.db "$LANE_DIR/milvus.db"        # the index is a folder
     read -r P_OLL P_LLM P_RAG P_PHX P_GRPC P_AIQ <<< "$(free_ports 6)"
     AIQ_PORT[$k]=$P_AIQ; PHX_PORT[$k]=$P_PHX
     G=${GPUS[$k]}
