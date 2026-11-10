@@ -7,6 +7,7 @@
 # =====================================================================
 #SBATCH --job-name=test_rules
 #SBATCH --nodelist=t01pdscgpu18
+#SBATCH --reservation=security      # the security team's reservation of node 18
 #SBATCH --gres=gpu:1
 #SBATCH --nice=1000
 #SBATCH --time=00:05:00

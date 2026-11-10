@@ -36,6 +36,7 @@ Notes on rule 3:
 
 ```bash
 #SBATCH --nodelist=t01pdscgpu18
+#SBATCH --reservation=security   # node 18 is reserved for group slurm-falcon-security (until Oct 2027)
 #SBATCH --gres=gpu:1            # at most gpu:2 (rule 2)
 #SBATCH --nice=1000
 #SBATCH --time=08:00:00
