@@ -30,12 +30,17 @@ stop_job() {
 # ---- Rule 2: GPU limit ----------------------------------------------
 if [ "$(date +%Y%m%d)" -le "$RESERVED_UNTIL" ]; then GPU_LIMIT=8; else GPU_LIMIT=2; fi
 if [ -n "$MAX_GPUS" ] && [ "$MAX_GPUS" -lt "$GPU_LIMIT" ]; then GPU_LIMIT="$MAX_GPUS"; fi
-[ -n "$CUDA_VISIBLE_DEVICES" ] || stop_job "rule 2: SLURM gave this job no GPU (add #SBATCH --gres=gpu:N)"
-N_GPUS=$(echo "$CUDA_VISIBLE_DEVICES" | tr ',' '\n' | grep -c .)
-[ "$N_GPUS" -ge 1 ] && [ "$N_GPUS" -le "$GPU_LIMIT" ] \
-    || stop_job "rule 2: this job has $N_GPUS GPUs, the limit is $GPU_LIMIT"
+N_GPUS=$(echo "${CUDA_VISIBLE_DEVICES:-}" | tr ',' '\n' | grep -c .)
+if [ "$N_GPUS" -eq 0 ]; then
+    # a job without GPU (e.g. downloads) must say so on purpose: NO_GPU_JOB=1
+    [ "${NO_GPU_JOB:-0}" = "1" ] || stop_job "rule 2: SLURM gave this job no GPU (add #SBATCH --gres=gpu:N)"
+fi
+[ "$N_GPUS" -le "$GPU_LIMIT" ] || stop_job "rule 2: this job has $N_GPUS GPUs, the limit is $GPU_LIMIT"
+# what the job can physically see must not exceed what it was given
+N_VISIBLE=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU')
+[ "$N_VISIBLE" -le "$N_GPUS" ] || stop_job "rule 2: the job can see $N_VISIBLE GPUs but was given $N_GPUS"
 
-echo "OK rules 1+2: node $(hostname -s), job $SLURM_JOB_ID, $N_GPUS GPU(s) [$CUDA_VISIBLE_DEVICES], limit $GPU_LIMIT"
+echo "OK rules 1+2: node $(hostname -s), job $SLURM_JOB_ID, $N_GPUS GPU(s) [${CUDA_VISIBLE_DEVICES:-none}], visible $N_VISIBLE, limit $GPU_LIMIT"
 
 # ---- Rule 3: call after starting the servers --------------------------
 # Lists every listening port that belongs to a process of THIS job and

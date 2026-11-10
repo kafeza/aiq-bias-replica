@@ -15,3 +15,7 @@ rag/ingested_*.txt
 rag/attack.json
 rag/attack.done.json
 .DS_Store
+
+# models downloaded on Dhabi (about 110 GB) and job logs: never upload
+ollama-models/
+*.log
