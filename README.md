@@ -7,6 +7,13 @@ rules. Every difference from NVIDIA's setup is listed in the runbook's change lo
 
 ---
 
+## First time on a new machine: NVIDIA's AI-Q code
+
+NVIDIA's AI-Q code is not in this repo. Download the version we use and add our changes
+(timeouts and model settings) as described in [`aiq_changes/README.md`](aiq_changes/README.md).
+
+---
+
 ## 0. Quick start (checklist)
 
 1. Ollama app is open (menu-bar icon).

@@ -1,0 +1,129 @@
+general:
+  use_uvloop: true
+  # LOCAL: tracing, from NVIDIA's docs/phoenix-tracing.md, sent to our Phoenix
+  # server (arize-phoenix 20.23.0, own environment .venv-phoenix, as NVIDIA ran
+  # Phoenix as a separate container). Exporter "otelcollector" instead of
+  # NVIDIA's "phoenix": the phoenix exporter imports phoenix.otel, which fails in
+  # NVIDIA's pinned environment (strawberry-graphql 0.243.1 vs pydantic 2.11.7).
+  # Both are AgentIQ exporters; the trace content comes from AI-Q itself.
+  telemetry:
+    tracing:
+      otel:
+        _type: otelcollector
+        endpoint: http://localhost:4317
+        project: ai_researcher
+  front_end:
+    _type: fastapi
+    endpoints:
+      - path: /generate_query
+        method: POST
+        description: Creates the query
+        function_name: generate_query
+      - path: /generate_summary
+        method: POST
+        description: Generates the summary
+        function_name: generate_summary
+      - path: /artifact_qa
+        method: POST
+        description: Q/A or chat about a previously generated artifact
+        function_name: artifact_qa
+      - path: /aiqhealth
+        method: GET
+        description: Health check for the AIQ AIRA service
+        function_name: health_check
+      - path: /default_collections
+        method: GET
+        description: Get the default collections
+        function_name: default_collections
+
+# ---------------------------------------------------------------------
+# Local Mac setup (copy of NVIDIA's config.yml; only the marked lines differ).
+# Models are served by Ollama's OpenAI-compatible endpoint. The model used
+# for a run is chosen per request by "llm_name" (falcon or nemotron).
+# The RAG server is our stand-in at http://localhost:8081 (rag/server.py).
+# ---------------------------------------------------------------------
+llms:
+  # Not used by the benchmark (only for chatting about a finished report).
+  # LOCAL: pointed at Falcon in Ollama so AI-Q starts without NVIDIA's 70B container.
+  instruct_llm:
+    _type: openai
+    model_name: falcon-h1-7b-32k
+    temperature: 0.0
+    base_url: http://localhost:11434/v1
+    api_key: not-needed
+  # LOCAL: model under test. Falcon-H1-7B-Instruct, full precision (same weights as
+  # falcon-h1-7b-bf16), with a 32,768-token context set in its Ollama Modelfile:
+  # Ollama's OpenAI endpoint cannot set the context per request, and its default
+  # window would silently cut AI-Q's longer prompts. Same settings as NVIDIA's
+  # nemotron entry below (temperature 0.5, max_tokens 5000, streaming).
+  falcon:
+    _type: openai
+    model_name: falcon-h1-7b-32k
+    temperature: 0.5
+    base_url: http://localhost:11434/v1
+    max_tokens: 5000
+    stream: true
+    api_key: not-needed
+  # LOCAL: model under test, Falcon-H1R-7B (TII's reasoning model), full precision,
+  # 32k context. It writes "<think> ... </think> answer", the format AI-Q expects
+  # (as Nemotron did), so AI-Q's code needs no thinking-tag change.
+  # Served by llama.cpp's server (bundled with Ollama) on port 8090 with
+  # --jinja (TII's original chat template from the model file) and
+  # --reasoning-format none (the full text incl. </think> reaches AI-Q).
+  # Ollama split the reasoning off in streaming mode, which AI-Q uses.
+  # Same settings as NVIDIA's nemotron entry below.
+  falcon_r:
+    _type: openai
+    model_name: falcon-h1r-7b
+    temperature: 0.5
+    base_url: http://localhost:8090/v1
+    max_tokens: 5000
+    stream: true
+    api_key: not-needed
+  # NVIDIA's original agent model, for the comparison runs.
+  # LOCAL: Nemotron Super 49B, 4-bit (Q4_K_M; NVIDIA used full precision), served
+  # like Falcon-H1R by llama.cpp's server on port 8091 (Terminal F, see README.md):
+  # --jinja, --reasoning-format none, 32k context, -n 5000. The name contains
+  # "nemotron", so AI-Q sends "detailed thinking on" (NVIDIA's behaviour).
+  # Was Ollama (port 11434) before 20 Oct.
+  nemotron:
+    _type: openai
+    model_name : nemotron-super-49b
+    temperature: 0.5
+    base_url: http://localhost:8091/v1
+    max_tokens: 5000
+    stream: true
+    api_key: not-needed
+
+
+functions:
+  generate_query:
+    _type: generate_queries
+
+  generate_summary:
+    _type: generate_summaries
+    # update to the IP address of the RAG server if you are not deploying RAG with docker compose
+    rag_url: http://localhost:8081/v1   # LOCAL: our RAG server (rag/server.py)
+
+  artifact_qa:
+    _type: artifact_qa
+    llm_name: instruct_llm
+    # update to the IP address of the RAG server if you are not deploying RAG with docker compose
+    rag_url: http://localhost:8081/v1   # LOCAL: our RAG server (rag/server.py)
+  
+  health_check:
+    _type: health_check
+
+  default_collections:
+    _type: default_collections
+    collections:
+      - name: "Biomedical_Dataset"
+        topic: "Biomedical"
+        report_organization: "You are a medical researcher who specializes in cystic fibrosis. Create a report analyzing how CFTR modulators can be used to restore CFTR protein functions. Include a 150-200 word abstract and a methods, results, and discussion section. Format your answer in paragraphs. Consider all (and only) relevant data. Give a factual report with cited sources."
+      - name: "Financial_Dataset"
+        topic: "Financial"
+        report_organization: "You are a financial analyst who specializes in financial statement analysis. Write a financial report analyzing the 2023 financial performance of Amazon. Identify trends in revenue growth, net income, and total assets. Discuss how these trends affected Amazon's yearly financial performance for 2023. Your output should be organized into a brief introduction, as many sections as necessary to create a comprehensive report, and a conclusion. Format your answer in paragraphs. Use factual sources such as Amazon's quarterly meeting releases for 2023. Cross analyze the sources to draw original and sound conclusions and explain your reasoning for arriving at conclusions. Do not make any false or unverifiable claims. I want a factual report with cited sources."
+
+
+workflow:
+  _type: ai_researcher

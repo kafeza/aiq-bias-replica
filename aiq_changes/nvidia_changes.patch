@@ -1,0 +1,30 @@
+diff --git a/aira/src/aiq_aira/constants.py b/aira/src/aiq_aira/constants.py
+index 1f8d553..951f80a 100644
+--- a/aira/src/aiq_aira/constants.py
++++ b/aira/src/aiq_aira/constants.py
+@@ -1,5 +1,8 @@
+ import os
+-ASYNC_TIMEOUT=120 
++# LOCAL CHANGE (was 120): our Mac RAG server answers one request at a time,
++# about 80 s each, and AI-Q sends its first three searches at once, so the
++# 2nd and 3rd would exceed 120 s and AI-Q would use the timeout message as a source.
++ASYNC_TIMEOUT=900
+ 
+ # Only needed if RAG endpoint requires an API key
+ RAG_API_KEY = os.getenv("RAG_API_KEY", "")
+diff --git a/aira/src/aiq_aira/search_utils.py b/aira/src/aiq_aira/search_utils.py
+index 70e8f52..9dcb419 100644
+--- a/aira/src/aiq_aira/search_utils.py
++++ b/aira/src/aiq_aira/search_utils.py
+@@ -70,7 +70,10 @@ async def fetch_query_results(
+     Calls the search_rag tool in parallel for each prompt in parallel.
+     Returns a list of tuples (answer, citations).
+     """
+-    async with aiohttp.ClientSession() as session:
++    # LOCAL CHANGE (was aiohttp's default 300 s total): our Mac RAG server answers
++    # one request at a time (~110 s each), so the 3rd of AI-Q's simultaneous first
++    # searches arrives after ~350 s; use AI-Q's own ASYNC_TIMEOUT instead.
++    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=ASYNC_TIMEOUT)) as session:
+         result =  await search_rag(session, rag_url, prompt, writer, collection)
+         return result
+ 
