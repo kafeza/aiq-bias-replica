@@ -77,6 +77,16 @@ wait_port() {    # $1 port  $2 pid  $3 name  $4 seconds
     stop_job "$3 did not start within $4 s (see its log in $LANE_DIR)"
 }
 
+wait_ready() {   # $1 url  $2 pid  $3 name  $4 seconds: until the server answers 200 (model loaded)
+    local i
+    for i in $(seq 1 "$4"); do
+        [ "$(curl -s -o /dev/null -w '%{http_code}' "$1")" = 200 ] && return 0
+        kill -0 "$2" 2>/dev/null || stop_job "$3 stopped while loading (see its log in $LANE_DIR)"
+        sleep 1
+    done
+    stop_job "$3 was not ready within $4 s (see its log in $LANE_DIR)"
+}
+
 # ---- start one lane per GPU ----------------------------------------------
 IFS=',' read -r -a GPUS <<< "$CUDA_VISIBLE_DEVICES"
 N=${#GPUS[@]}
@@ -98,11 +108,15 @@ for k in $(seq 0 $((N - 1))); do
     CUDA_VISIBLE_DEVICES=$G OLLAMA_HOST="127.0.0.1:$P_OLL" OLLAMA_MODELS="$MODELS" OLLAMA_KEEP_ALIVE=-1 \
         "$OLLAMA_BIN" serve > "$LANE_DIR/ollama.log" 2>&1 &
     wait_port "$P_OLL" $! "lane $k Ollama" 60
+    # load the search answers' model now (and keep it loaded), so no run waits for it
+    curl -s -m 900 -o /dev/null "http://127.0.0.1:$P_OLL/api/generate" \
+        -d '{"model": "nemotron-super-49b", "keep_alive": -1}' || stop_job "lane $k: Ollama could not load nemotron-super-49b"
 
     CUDA_VISIBLE_DEVICES=$G "$LLAMA_SERVER" -m "$MODELS/blobs/sha256-$BLOB" --alias "$ALIAS" --jinja \
         --reasoning-format none -c 32768 -np 1 -ngl 999 -n 5000 $EXTRA \
         --host 127.0.0.1 --port "$P_LLM" > "$LANE_DIR/llama-server.log" 2>&1 &
     wait_port "$P_LLM" $! "lane $k llama-server" 600
+    wait_ready "http://127.0.0.1:$P_LLM/health" $! "lane $k llama-server (model loading)" 900
 
     PHOENIX_HOST=127.0.0.1 PHOENIX_PORT=$P_PHX PHOENIX_GRPC_PORT=$P_GRPC PHOENIX_WORKING_DIR="$LANE_DIR/phoenix" \
         .venv-phoenix/bin/phoenix serve > "$LANE_DIR/phoenix.log" 2>&1 &
