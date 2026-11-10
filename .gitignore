@@ -19,3 +19,7 @@ rag/attack.done.json
 # models downloaded on Dhabi (about 110 GB) and job logs: never upload
 ollama-models/
 *.log
+
+# installed on Dhabi by dhabi/setup_envs.sbatch: never upload
+.tools/
+hf-cache/
