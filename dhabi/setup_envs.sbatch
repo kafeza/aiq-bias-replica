@@ -10,6 +10,7 @@
 #      (dhabi/requirements/*.txt): .venv-rag, .venv-phoenix, aiq/aira/.venv
 #   5. Phoenix patched to listen on 127.0.0.1 only (rule 3)
 #   6. the two search models from Hugging Face, the Mac's exact versions (hf-cache/)
+#   7. the search index from index/ (identical to the Mac's, checked)
 # Everything stays in the repo folder and is never uploaded (.gitignore).
 # Run from the repo folder on Dhabi:   sbatch dhabi/setup_envs.sbatch
 # Follow it:                           tail -f setup_envs_<job number>.log
@@ -107,6 +108,18 @@ for repo, rev in [("nvidia/llama-nemotron-embed-1b-v2", "113abe4acafa848e77ead9c
     open(os.path.join(refs, "main"), "w").write(rev)
     print(repo, "version", rev[:7], "->", path)
 EOF
+
+# ---- 7. search index (identical to the Mac's) -----------------------------
+step "7. search index from index/ (checked against the Mac's)"
+if [ ! -d rag/milvus.db ]; then
+    cat index/milvus.db.tar.gz.part-* > .tools/milvus.db.tar.gz
+    [ "$(sha256sum .tools/milvus.db.tar.gz | cut -d' ' -f1)" = 383c7f47dbcdcb8b710d8be22e154e9617830d4000b0846593eb7a980066b8f3 ] \
+        || { echo "STOP: the index archive is damaged"; exit 1; }
+    tar -xzf .tools/milvus.db.tar.gz -C rag && rm .tools/milvus.db.tar.gz
+fi
+[ "$( (cd rag/milvus.db && find . -type f ! -name LOCK | LC_ALL=C sort | xargs sha256sum) | sha256sum | cut -d' ' -f1)" \
+  = f6cffa8c70e09f9de736f6dc2557de2980a08de731414322f0aaa8eabea6e4d6 ] \
+    && echo "index identical to the Mac's" || { echo "STOP: rag/milvus.db differs from the Mac's index"; exit 1; }
 
 # ---- check ------------------------------------------------------------------
 step "check: key versions (must match the Mac)"
