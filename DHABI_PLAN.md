@@ -34,10 +34,14 @@ Notes on rule 3:
   (memory cannot be requested: SLURM does not count it on node 18), and **short jobs** (one batch of runs per job).
 - If node 18 is busy, the job waits; it never moves to another node.
 
+Node 18 is reserved for the group slurm-falcon-security (reservation `security`,
+until Oct 2027). GPUs: up to 8 until Sun 15 Nov 2026, then at most 2 (rule 2).
+No comments at the end of `#SBATCH` lines.
+
 ```bash
 #SBATCH --nodelist=t01pdscgpu18
-#SBATCH --reservation=security   # node 18 is reserved for group slurm-falcon-security (until Oct 2027)
-#SBATCH --gres=gpu:1            # at most gpu:2 (rule 2)
+#SBATCH --reservation=security
+#SBATCH --gres=gpu:1
 #SBATCH --nice=1000
 #SBATCH --time=08:00:00
 #SBATCH --cpus-per-task=8

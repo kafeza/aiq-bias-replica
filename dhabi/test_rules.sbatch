@@ -6,8 +6,9 @@
 # Then read the log:                   cat test_rules_<job number>.log
 # =====================================================================
 #SBATCH --job-name=test_rules
+# node 18 only, in the security team's reservation of node 18
 #SBATCH --nodelist=t01pdscgpu18
-#SBATCH --reservation=security      # the security team's reservation of node 18
+#SBATCH --reservation=security
 #SBATCH --gres=gpu:1
 #SBATCH --nice=1000
 #SBATCH --time=00:05:00
