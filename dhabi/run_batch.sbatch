@@ -100,6 +100,9 @@ wait_ready() {   # $1 url  $2 pid  $3 name  $4 seconds: until the server answers
 }
 
 # ---- start one lane per GPU ----------------------------------------------
+# the search server's context window (Ollama is preloaded with the same, see below)
+SEARCH_CTX=$(grep -oE '^NUM_CTX = [0-9]+' rag/server.py | grep -oE '[0-9]+$')
+[ -n "$SEARCH_CTX" ] || stop_job "could not read NUM_CTX from rag/server.py"
 IFS=',' read -r -a GPUS <<< "$CUDA_VISIBLE_DEVICES"
 N=${#GPUS[@]}
 echo "Starting $N lane(s), agent model $LLM ($ALIAS), tasks: $TASKS"
@@ -117,12 +120,18 @@ for k in $(seq 0 $((N - 1))); do
         -e "s#localhost:4317#127.0.0.1:$P_GRPC#g" aiq/aira/configs/config_local.yml > "$LANE_DIR/config.yml"
     grep -q "localhost" "$LANE_DIR/config.yml" && stop_job "lane $k: an address in config.yml was not replaced"
 
+    # OLLAMA_NUM_PARALLEL=1: the search server sends one request at a time, so Ollama
+    # reserves working memory for one request only
     CUDA_VISIBLE_DEVICES=$G OLLAMA_HOST="127.0.0.1:$P_OLL" OLLAMA_MODELS="$MODELS" OLLAMA_KEEP_ALIVE=-1 \
-        "$OLLAMA_BIN" serve > "$LANE_DIR/ollama.log" 2>&1 &
+        OLLAMA_NUM_PARALLEL=1 "$OLLAMA_BIN" serve > "$LANE_DIR/ollama.log" 2>&1 &
     wait_port "$P_OLL" $! "lane $k Ollama" 60
-    # load the search answers' model now (and keep it loaded), so no run waits for it
+    # load the search answers' model now (and keep it loaded), so no run waits for it.
+    # Load it with the search server's own context (NUM_CTX in rag/server.py): without it,
+    # Ollama takes the model's maximum (131,072 tokens = 25 GB for Nemotron), and with
+    # Nemotron also as the agent on the same GPU that ran out of memory (job 592734).
     curl -s -m 900 -o /dev/null "http://127.0.0.1:$P_OLL/api/generate" \
-        -d '{"model": "nemotron-super-49b", "keep_alive": -1}' || stop_job "lane $k: Ollama could not load nemotron-super-49b"
+        -d "{\"model\": \"nemotron-super-49b\", \"keep_alive\": -1, \"options\": {\"num_ctx\": $SEARCH_CTX}}" \
+        || stop_job "lane $k: Ollama could not load nemotron-super-49b"
 
     CUDA_VISIBLE_DEVICES=$G "$LLAMA_SERVER" -m "$MODELS/blobs/sha256-$BLOB" --alias "$ALIAS" --jinja \
         --reasoning-format none -c 32768 -np 1 -ngl 999 -n 5000 $EXTRA \
