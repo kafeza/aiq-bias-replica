@@ -50,8 +50,20 @@ for f in "$OLLAMA_BIN" "$LLAMA_SERVER" "$MODELS/blobs/sha256-$BLOB" rag/milvus.d
          .venv-rag/bin/python .venv-phoenix/bin/phoenix aiq/aira/.venv/bin/aiq; do
     [ -e "$f" ] || stop_job "missing $f (run download_models / setup_envs first; the index is rag/milvus.db)"
 done
-# llama-server bundled with Ollama finds its GPU libraries next to it
-export LD_LIBRARY_PATH="$(find "$OLLAMA_DIR/lib/ollama" -type d | tr '\n' ':')${LD_LIBRARY_PATH:-}"
+# llama-server bundled with Ollama has its GPU part in a separate library (cuda_v13 or
+# cuda_v12); started directly, it must be told where it is, or it runs on the CPU only
+# (hundreds of times slower). Pick the one that sees the GPU, else stop.
+CUDA_DIR=""
+for d in cuda_v13 cuda_v12; do
+    lib="$OLLAMA_DIR/lib/ollama/$d"
+    [ -f "$lib/libggml-cuda.so" ] || continue
+    if GGML_BACKEND_PATH="$lib/libggml-cuda.so" LD_LIBRARY_PATH="$OLLAMA_DIR/lib/ollama:$lib" \
+        "$LLAMA_SERVER" --list-devices 2>/dev/null | grep -q "CUDA0"; then CUDA_DIR="$lib"; break; fi
+done
+[ -n "$CUDA_DIR" ] || stop_job "the model server cannot use the GPU (no working cuda_v13/cuda_v12 library in $OLLAMA_DIR/lib/ollama)"
+export GGML_BACKEND_PATH="$CUDA_DIR/libggml-cuda.so"
+export LD_LIBRARY_PATH="$OLLAMA_DIR/lib/ollama:$CUDA_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+echo "model server GPU library: $(basename "$CUDA_DIR")"
 export HF_HOME="$REPO/hf-cache" HF_HUB_OFFLINE=1     # search models: the downloaded versions only
 
 # ---- stop everything at the end, also when cancelled or out of time ----
@@ -117,6 +129,7 @@ for k in $(seq 0 $((N - 1))); do
         --host 127.0.0.1 --port "$P_LLM" > "$LANE_DIR/llama-server.log" 2>&1 &
     wait_port "$P_LLM" $! "lane $k llama-server" 600
     wait_ready "http://127.0.0.1:$P_LLM/health" $! "lane $k llama-server (model loading)" 900
+    grep -q "no usable GPU" "$LANE_DIR/llama-server.log" && stop_job "lane $k: llama-server is not using the GPU (see $LANE_DIR/llama-server.log)"
 
     PHOENIX_HOST=127.0.0.1 PHOENIX_PORT=$P_PHX PHOENIX_GRPC_PORT=$P_GRPC PHOENIX_WORKING_DIR="$LANE_DIR/phoenix" \
         .venv-phoenix/bin/phoenix serve > "$LANE_DIR/phoenix.log" 2>&1 &
