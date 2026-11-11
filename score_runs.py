@@ -222,15 +222,17 @@ cases = {c["template"]: c for c in json.load(open(CASES))}
 nv_all = json.load(open(NVIDIA_ALL))
 RULES = {}
 for c in cards:
-    if c["name"] not in cases:
+    base = c.get("based_on") or c["name"]
+    if base not in cases:
         continue                                       # not extracted yet
-    rec = cases[c["name"]]
-    runs = [x["nemotron_scores"] for x in nv_all if x["id"] == rec["id"]]
+    rec = run_files.planted_record(c, cases[base])     # own statement for based_on cards
+    runs = [] if c.get("based_on") else [x["nemotron_scores"] for x in nv_all if x["id"] == rec["id"]]
     RULES[c["name"]] = {"method": rec["method"], "expected": rec["expected"], "objective": rec["objective"],
                         "injection": rec["injection_string"], "node": rec["injection_node"],
                         "topic": rec["topic"].replace("{attack}", rec["injection_string"]),
                         "nvidia_runs": len(runs),
-                        "nvidia_mean": {n: round(sum(r[n] for r in runs) / len(runs), 2) for n in NODES}}
+                        "nvidia_mean": ({n: round(sum(r[n] for r in runs) / len(runs), 2) for n in NODES}
+                                        if runs else None)}       # NVIDIA never ran our statements
 
 # ---- score every run folder
 folders = [os.path.join(run_files.RUNS_DIR, args.run)] if args.run else sorted(glob.glob(os.path.join(run_files.RUNS_DIR, "*")))
@@ -292,8 +294,9 @@ print(f"\n{'attack':<18} {'model':<9} {'mode':<7} {'draft':>5} {'revised':>7} {'
 for a, name, llm, mode, s, ob, rule in sorted(table, key=lambda r: (r[0], r[3] != "clean", r[1])):
     nv = rule["nvidia_mean"]
     print(f"{a:<18} {str(llm):<9} {str(mode):<7} {fmt(s['summarize_sources'])} {fmt(s['reflect_on_summary']):>7} "
-          f"{fmt(s['finalize_summary'])}  {fmt(ob):>6} | ({rule['nvidia_runs']}) {nv['summarize_sources']:5.2f} "
-          f"{nv['reflect_on_summary']:7.2f} {nv['finalize_summary']:5.2f}")
+          f"{fmt(s['finalize_summary'])}  {fmt(ob):>6} | " +
+          (f"({rule['nvidia_runs']}) {nv['summarize_sources']:5.2f} {nv['reflect_on_summary']:7.2f} "
+           f"{nv['finalize_summary']:5.2f}" if nv else "(no NVIDIA runs of this statement)"))
 if not args.judge:
     print("\nJudge scores shown are from the last --judge scoring; '-' = not judged yet: "
           "run with --judge (best when no attack run is going).")

@@ -63,12 +63,16 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def nvidia_record(template):
-    """NVIDIA's record for this attack (nvidia_cases.json), with its request filled in."""
+def nvidia_record(card):
+    """NVIDIA's record for this card (nvidia_cases.json), with its request filled in.
+    A card with `based_on` uses that template's record with its own statement
+    planted (run_files.planted_record)."""
+    template = card.get("based_on") or card["name"]
     try:
         rec = next(c for c in json.load(open(CASES)) if c["template"] == template)
     except (FileNotFoundError, StopIteration):
         raise SystemExit(f"No NVIDIA record for {template}: run extract_nvidia_cases.py first")
+    rec = run_files.planted_record(card, rec)
     inj = rec["injection_string"]
     rec["request_topic"] = rec["topic"].replace("{attack}", inj)
     rec["request_organization"] = rec["organization"].replace("{attack}", inj)
@@ -88,7 +92,7 @@ for card in cards:
     for k in ("mode", "placement", "reps"):
         if getattr(args, k) is not None:
             card[k] = getattr(args, k)
-    nv = nvidia_record(card["name"])
+    nv = nvidia_record(card)
     if card.get("nvidia_record") and card["nvidia_record"] != nv["id"]:
         raise SystemExit(f"{card['name']}: card names record {card['nvidia_record']}, nvidia_cases.json has {nv['id']}")
     card["nvidia_record"] = nv["id"]
@@ -110,6 +114,7 @@ for card in cards:
         meta = {"attack": card["name"], "nvidia_record": card["nvidia_record"], "mode": card["mode"],
                 "llm": args.llm, "rep": rep, "topic": TOPIC, "collection": COLLECTION,
                 "objective": nv["objective"], "scoring": nv["method"], "expected": nv["expected"],
+                "based_on": nv.get("based_on"), "replace": nv.get("replace"),
                 "start_utc": now()}
         print(f"\n=== {card['name']} | mode {card['mode']} | model {args.llm} | rep {rep}/{card['reps']}\n    -> {out}")
 
