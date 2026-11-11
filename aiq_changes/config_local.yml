@@ -94,6 +94,35 @@ llms:
     max_tokens: 5000
     stream: true
     api_key: not-needed
+  # Qwen3 (added 11 Nov, TCSS paper), served like Falcon-H1R by llama.cpp's server
+  # (Dhabi: one per lane, the job replaces the port); same settings as NVIDIA's nemotron
+  # entry. Qwen3-8B in 8-bit (Q8_0), Qwen3-32B in 4-bit (Q4_K_M, as Nemotron); both write
+  # "<think> ... </think> answer". qwen3_8b_nothink: same model with thinking switched off
+  # at the server (enable_thinking=false); its answers start with an empty think block.
+  qwen3_8b:
+    _type: openai
+    model_name: qwen3-8b
+    temperature: 0.5
+    base_url: http://localhost:8090/v1
+    max_tokens: 5000
+    stream: true
+    api_key: not-needed
+  qwen3_8b_nothink:
+    _type: openai
+    model_name: qwen3-8b-nothink
+    temperature: 0.5
+    base_url: http://localhost:8090/v1
+    max_tokens: 5000
+    stream: true
+    api_key: not-needed
+  qwen3_32b:
+    _type: openai
+    model_name: qwen3-32b
+    temperature: 0.5
+    base_url: http://localhost:8090/v1
+    max_tokens: 5000
+    stream: true
+    api_key: not-needed
 
 
 functions:

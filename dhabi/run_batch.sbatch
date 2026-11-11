@@ -44,7 +44,17 @@ case "$LLM" in
             EXTRA="--top-k 20 --top-p 0.95" ;;
   nemotron) BLOB=d3fc12f4480cad5060f183d6c186ca47d800509224632bb22e15791711950524; ALIAS=nemotron-super-49b
             EXTRA="--top-p 0.95" ;;
-  *) stop_job "LLM must be falcon_r or nemotron, not '$LLM'" ;;
+  # Qwen3 (official GGUF files from Qwen/Qwen3-8B-GGUF and Qwen/Qwen3-32B-GGUF): top-k 20 and
+  # top-p 0.95, Qwen's values for thinking mode; AI-Q sends temperature 0.5 as for every model.
+  # qwen3_8b_nothink: the same file and settings, thinking switched off by Qwen's own template
+  # switch (enable_thinking=false) at the server; AI-Q's prompts are unchanged.
+  qwen3_8b) BLOB=408b955510e196121c1c375201744783b5c9a43c7956d73fc78df54c66e883d6; ALIAS=qwen3-8b
+            EXTRA="--top-k 20 --top-p 0.95" ;;
+  qwen3_8b_nothink) BLOB=408b955510e196121c1c375201744783b5c9a43c7956d73fc78df54c66e883d6; ALIAS=qwen3-8b-nothink
+            EXTRA="--top-k 20 --top-p 0.95 --chat-template-kwargs {\"enable_thinking\":false}" ;;
+  qwen3_32b) BLOB=efd971561896866f0e910cce52761ca77b1b138090c7f15fe284676d57d1f689; ALIAS=qwen3-32b
+            EXTRA="--top-k 20 --top-p 0.95" ;;
+  *) stop_job "LLM must be falcon_r, nemotron, qwen3_8b, qwen3_8b_nothink or qwen3_32b, not '$LLM'" ;;
 esac
 for f in "$OLLAMA_BIN" "$LLAMA_SERVER" "$MODELS/blobs/sha256-$BLOB" rag/milvus.db \
          .venv-rag/bin/python .venv-phoenix/bin/phoenix aiq/aira/.venv/bin/aiq; do
@@ -117,7 +127,7 @@ for k in $(seq 0 $((N - 1))); do
     # this lane's copy of the agent's settings: every address -> this lane's ports
     sed -e "s#localhost:11434#127.0.0.1:$P_OLL#g" -e "s#localhost:8090#127.0.0.1:$P_LLM#g" \
         -e "s#localhost:8091#127.0.0.1:$P_LLM#g"  -e "s#localhost:8081#127.0.0.1:$P_RAG#g" \
-        -e "s#localhost:4317#127.0.0.1:$P_GRPC#g" aiq/aira/configs/config_local.yml > "$LANE_DIR/config.yml"
+        -e "s#localhost:4317#127.0.0.1:$P_GRPC#g" aiq_changes/config_local.yml > "$LANE_DIR/config.yml"
     grep -q "localhost" "$LANE_DIR/config.yml" && stop_job "lane $k: an address in config.yml was not replaced"
 
     # OLLAMA_NUM_PARALLEL=1: the search server sends one request at a time, so Ollama

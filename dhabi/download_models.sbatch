@@ -43,14 +43,24 @@ MODELS=(
   "hf.co/tiiuae/Falcon-H1R-7B-GGUF:BF16|ac852a921c550ec9c55490c2a7aabd6706843e86b1a8cb9c31d5da908245f77e"
   "hf.co/bartowski/nvidia_Llama-3_3-Nemotron-Super-49B-v1-GGUF:Q4_K_M|d3fc12f4480cad5060f183d6c186ca47d800509224632bb22e15791711950524"
   "gpt-oss:120b|6be6d66a3f546d8c19b130dc41dc24b2fc159f84ffbc76a0ee0676205083cf5a"
+  # added 11 Nov: official Qwen files; expected SHA-256 = Hugging Face's checksum of the file
+  "hf.co/Qwen/Qwen3-8B-GGUF:Q8_0|408b955510e196121c1c375201744783b5c9a43c7956d73fc78df54c66e883d6"
+  "hf.co/Qwen/Qwen3-32B-GGUF:Q4_K_M|efd971561896866f0e910cce52761ca77b1b138090c7f15fe284676d57d1f689"
 )
+# ONLY=<text>: download and check only the models whose name contains <text>
+# (e.g. --export=ALL,ONLY=Qwen3 for the two Qwen files; the others are already there)
+if [ -n "${ONLY:-}" ]; then
+    KEEP=(); for e in "${MODELS[@]}"; do case "${e%%|*}" in *"$ONLY"*) KEEP+=("$e");; esac; done
+    [ ${#KEEP[@]} -gt 0 ] || { echo "ONLY=$ONLY matches no model"; exit 1; }
+    MODELS=("${KEEP[@]}")
+fi
 for entry in "${MODELS[@]}"; do
     name="${entry%%|*}"
     echo "=== downloading $name"
     "$OLLAMA_BIN" pull "$name" || { echo "FAILED: $name"; exit 1; }
 done
 # the search server asks Ollama for "nemotron-super-49b" (same file, second name, as on the Mac)
-"$OLLAMA_BIN" cp "hf.co/bartowski/nvidia_Llama-3_3-Nemotron-Super-49B-v1-GGUF:Q4_K_M" nemotron-super-49b
+[ -z "${ONLY:-}" ] && "$OLLAMA_BIN" cp "hf.co/bartowski/nvidia_Llama-3_3-Nemotron-Super-49B-v1-GGUF:Q4_K_M" nemotron-super-49b
 
 echo "=== checking that the files are identical to the Mac's (SHA-256; a few minutes)"
 ok=1
@@ -58,10 +68,10 @@ for entry in "${MODELS[@]}"; do
     name="${entry%%|*}"; want="${entry##*|}"
     blob="$OLLAMA_MODELS/blobs/sha256-$want"
     if [ -f "$blob" ] && [ "$(sha256sum "$blob" | cut -d' ' -f1)" = "$want" ]; then
-        echo "  same as Mac: $name"
+        echo "  checksum OK: $name"
     else
         echo "  DIFFERENT or missing: $name (expected $want)"; ok=0
     fi
 done
 "$OLLAMA_BIN" list
-[ "$ok" -eq 1 ] && echo "DOWNLOAD DONE: all models identical to the Mac" || { echo "DOWNLOAD PROBLEM: see above"; exit 1; }
+[ "$ok" -eq 1 ] && echo "DOWNLOAD DONE: all checksums OK" || { echo "DOWNLOAD PROBLEM: see above"; exit 1; }
