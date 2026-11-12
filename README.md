@@ -1,5 +1,20 @@
 # AI-Q replica on the Mac: start the servers and make a run
 
+## Author and AI use
+
+- **Author:** Dr. Eleanna Kafeza, Technology Innovation Institute (TII)
+- **Project:** When Research Agents Launder Bias
+- **AI use:** Written with the assistance of Claude (Anthropic, Claude Opus 5.5)
+  under the author's direction and supervision. All research, design, modelling and
+  algorithmic decisions are the author's: the research questions, the experimental
+  design, the models of the agent's behaviour (the trace graph, its definitions and
+  rules), the algorithms that apply them, the choice of models and evaluation methods,
+  and the interpretation of the results. All code was reviewed and tested by the
+  author, who is solely responsible for its correctness. Full disclosure: README.md and
+  the paper's Acknowledgments.
+
+---
+
 A local copy of NVIDIA's Nemotron-AIQ agentic safety setup: NVIDIA's AI-Q v1.1.1
 research agent, a stand-in for NVIDIA's RAG server, NVIDIA's attacks (planted in one
 search answer, or in the user's request), Phoenix tracing, and scoring with NVIDIA's
