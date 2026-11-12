@@ -10,7 +10,8 @@
 #
 # Settings (given when starting the job):
 #   TASKS  which attacks and how many runs each, e.g. "BIAS_STEREOTYPE_1:20"
-#          (several: "BIAS_STEREOTYPE_1:20 OTHER_CARD:10"); names from attacks.yml
+#          (several: "BIAS_STEREOTYPE_1:20 OTHER_CARD:10"); names from attacks.yml;
+#          CLEAN = a run without attack (run_report.py), e.g. "CLEAN:10"
 #   LLM    the agent's model: falcon_r (default) or nemotron
 # Examples, from the repo folder on Dhabi:
 #   sbatch --export=ALL,TASKS="BIAS_STEREOTYPE_1:1" dhabi/run_batch.sbatch            # 1 test run, 1 GPU
@@ -174,7 +175,7 @@ check_localhost_only                                 # rule 3, once everything i
 ITEMS=()
 for t in $TASKS; do
     name="${t%%:*}"; reps="${t##*:}"
-    grep -q "name: $name\b" attacks.yml || stop_job "no attack card '$name' in attacks.yml"
+    [ "$name" = "CLEAN" ] || grep -q "name: $name\b" attacks.yml || stop_job "no attack card '$name' in attacks.yml"
     for r in $(seq 1 "$reps"); do ITEMS+=("$name"); done
 done
 echo "${#ITEMS[@]} runs over $N lane(s)"
@@ -188,8 +189,16 @@ for k in $(seq 0 $((N - 1))); do
         mkdir -p "$RUNS_DIR"
         for j in $(seq "$k" "$N" $((${#ITEMS[@]} - 1))); do
             echo "[lane $k] run $((j + 1))/${#ITEMS[@]}: ${ITEMS[$j]}"
-            .venv-rag/bin/python run_attack.py --attack "${ITEMS[$j]}" --llm "$LLM" --reps 1 \
-                > "$LANE_DIR/run_$((j + 1)).log" 2>&1 || echo "[lane $k] run $((j + 1)) FAILED (see $LANE_DIR/run_$((j + 1)).log)"
+            if [ "${ITEMS[$j]}" = "CLEAN" ]; then
+                # no attack: clear any card left in this lane (e.g. by a failed attack run),
+                # then ask for the report as NVIDIA's harness does (run_report.py)
+                rm -f "$LANE_DIR/attack.json" "$LANE_DIR/attack.done.json"
+                .venv-rag/bin/python run_report.py --llm "$LLM" \
+                    > "$LANE_DIR/run_$((j + 1)).log" 2>&1 || echo "[lane $k] run $((j + 1)) FAILED (see $LANE_DIR/run_$((j + 1)).log)"
+            else
+                .venv-rag/bin/python run_attack.py --attack "${ITEMS[$j]}" --llm "$LLM" --reps 1 \
+                    > "$LANE_DIR/run_$((j + 1)).log" 2>&1 || echo "[lane $k] run $((j + 1)) FAILED (see $LANE_DIR/run_$((j + 1)).log)"
+            fi
             grep -E "^4\. done|WARNING" "$LANE_DIR/run_$((j + 1)).log" | sed "s/^/[lane $k] /"
         done
     ) &

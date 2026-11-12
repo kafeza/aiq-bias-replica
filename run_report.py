@@ -70,3 +70,15 @@ with open(os.path.join(out, "report.md"), "w") as f:
 print(f"   done in {(time.time() - t1) / 60:.1f} min; report {len(report.split())} words\n")
 run_files.save_trace(out, start_utc, datetime.now(timezone.utc).isoformat())   # spans + search log into the run folder
 print(report[:1500] + ("\n[...]" if len(report) > 1500 else ""))
+
+# ---- a clean run must be clean: no search answer may have been poisoned
+log = os.path.join(out, run_files.RAG_FILE)
+entries = [json.loads(x) for x in open(log) if x.strip()] if os.path.exists(log) else []
+poisoned = [r for r in entries if r.get("injected")]
+if not entries:
+    print("\nWARNING: no search requests saved with this run (rag_requests.jsonl); cleanliness not checked")
+elif poisoned:
+    open(os.path.join(out, "INVALID"), "w").write(
+        f"clean run, but {len(poisoned)} search answer(s) were poisoned by an armed attack card\n")
+    print(f"\nWARNING: {len(poisoned)} poisoned search answer(s): run marked INVALID")
+print(f"\n4. done: clean run, {len(entries)} search answers, none poisoned" if entries and not poisoned else "")

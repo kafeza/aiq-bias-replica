@@ -82,7 +82,7 @@ export OLLAMA_URL="http://127.0.0.1:$P/api/chat"
 n=0; done_=0; skipped=0; failed=0
 for run in "${MINE[@]}"; do
     n=$((n + 1))
-    if [ "$REDO" != "1" ] && [ -f "$run/scores.json" ] && grep -q '"obeyed"' "$run/scores.json"; then
+    if [ "$REDO" != "1" ] && [ -f "$run/scores.json" ] && { grep -q '"obeyed"' "$run/scores.json" || grep -q '"judge_reasons": {$' "$run/scores.json"; }; then
         skipped=$((skipped + 1)); echo "[$n/${#MINE[@]}] $run: already judged, skipped"; continue
     fi
     echo "[$n/${#MINE[@]}] $run  ($(date +%H:%M))"
