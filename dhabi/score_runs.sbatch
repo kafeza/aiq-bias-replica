@@ -62,7 +62,7 @@ trap 'echo "job cancelled or out of time: stopping the judge"; exit 1' TERM INT
 P=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
 mkdir -p "logs/score_runs"
 OLLAMA_HOST="127.0.0.1:$P" OLLAMA_MODELS="$MODELS" OLLAMA_KEEP_ALIVE=-1 OLLAMA_NUM_PARALLEL=1 \
-    "$OLLAMA_BIN" serve > "logs/score_runs/ollama_$SLURM_JOB_ID.log" 2>&1 &
+    OLLAMA_LOAD_TIMEOUT=30m "$OLLAMA_BIN" serve > "logs/score_runs/ollama_$SLURM_JOB_ID.log" 2>&1 &
 for i in $(seq 1 60); do curl -s -o /dev/null "http://127.0.0.1:$P/api/version" && break; sleep 1; done
 curl -s -o /dev/null "http://127.0.0.1:$P/api/version" || stop_job "the judge did not start (see logs/score_runs/ollama_$SLURM_JOB_ID.log)"
 # load the judge now, with the scorer's own context (num_ctx 16384 in score_runs.py),

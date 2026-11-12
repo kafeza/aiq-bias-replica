@@ -134,7 +134,7 @@ for k in $(seq 0 $((N - 1))); do
     # OLLAMA_NUM_PARALLEL=1: the search server sends one request at a time, so Ollama
     # reserves working memory for one request only
     CUDA_VISIBLE_DEVICES=$G OLLAMA_HOST="127.0.0.1:$P_OLL" OLLAMA_MODELS="$MODELS" OLLAMA_KEEP_ALIVE=-1 \
-        OLLAMA_NUM_PARALLEL=1 "$OLLAMA_BIN" serve > "$LANE_DIR/ollama.log" 2>&1 &
+        OLLAMA_NUM_PARALLEL=1 OLLAMA_LOAD_TIMEOUT=30m "$OLLAMA_BIN" serve > "$LANE_DIR/ollama.log" 2>&1 &
     wait_port "$P_OLL" $! "lane $k Ollama" 60
     # load the search answers' model now (and keep it loaded), so no run waits for it.
     # Load it with the search server's own context (NUM_CTX in rag/server.py): without it,
