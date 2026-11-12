@@ -114,6 +114,12 @@ def attack_hook(answer, question):
         card = json.load(f)
     if card.get("target_query") != "*" and _norm(question) != _norm(card.get("target_query", "")):
         return answer, None
+    if card.get("every"):                         # second agent (odr/run_odr.py): its queries are not known
+        card["seen"] = card.get("seen", 0) + 1    # in advance, so the card counts requests instead: poison
+        if card["seen"] % card["every"] != 0:     # every `every`-th request, at most call_limit times
+            with open(ATTACK_FILE, "w") as f:     # (AI-Q's cards have no `every`: unchanged)
+                json.dump(card, f, indent=1)
+            return answer, None
     if card["mode"] == "replay":
         poisoned, at = card["recorded_answer"], None
     else:

@@ -26,3 +26,6 @@ hf-cache/
 
 # per-lane working files on Dhabi (servers' logs, attack cards, Phoenix data)
 lanes/
+
+# second agent (open_deep_research) run folders: outputs, never upload
+runs_odr/
