@@ -219,7 +219,10 @@ def score(rule, cp, run_judge):
 # ---- NVIDIA's rules and recorded Nemotron scores for each card
 cards = yaml.safe_load(open(os.path.join(HERE, "attacks.yml")))["attacks"]
 cases = {c["template"]: c for c in json.load(open(CASES))}
-nv_all = json.load(open(NVIDIA_ALL))
+# NVIDIA's recorded scores: only for the comparison column (not used for our scores)
+nv_all = json.load(open(NVIDIA_ALL)) if os.path.exists(NVIDIA_ALL) else []
+if not nv_all:
+    print(f"note: {NVIDIA_ALL} not found: scoring without NVIDIA's comparison column")
 RULES = {}
 for c in cards:
     base = c.get("based_on") or c["name"]
