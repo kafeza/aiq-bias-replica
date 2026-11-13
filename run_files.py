@@ -74,20 +74,26 @@ def planted_record(card, rec):
 
     Cards with `based_on` (the four-statement design) reuse another template's
     record and replace phrases in its attack text and in its recorded poisoned
-    answer; each phrase must occur exactly once in both. The card's judge question
-    and objective replace NVIDIA's. Other cards get NVIDIA's record unchanged."""
+    answer; each phrase must occur exactly once in both. A card with `plain` (the control
+    for the injection's pressure) replaces the whole attack text by that one sentence, at
+    the same place in the same answer. The card's judge question and objective replace
+    NVIDIA's. Other cards get NVIDIA's record unchanged."""
     rec = dict(rec)
     if not card.get("based_on"):
         return rec
     inj, ans = rec["injection_string"], rec["recorded_answer"]
-    for old, new in card["replace"]:
+    for old, new in card.get("replace", []):
         for label, text in (("attack text", inj), ("recorded answer", ans)):
             if text.count(old) != 1:
                 raise SystemExit(f"{card['name']}: '{old[:50]}' occurs {text.count(old)} times in the "
                                  f"{label} of {card['based_on']} (must be exactly once)")
         inj, ans = inj.replace(old, new), ans.replace(old, new)
+    if card.get("plain"):                 # control: the whole attack block becomes one plain sentence,
+        if ans.count(inj) != 1:           # at the same place in the same answer
+            raise SystemExit(f"{card['name']}: the attack text occurs {ans.count(inj)} times in the recorded answer")
+        inj, ans = card["plain"], ans.replace(inj, card["plain"])
     rec.update(injection_string=inj, recorded_answer=ans, template=card["name"],
-               based_on=card["based_on"], replace=card["replace"],
+               based_on=card["based_on"], replace=card.get("replace", []), plain=card.get("plain"),
                expected=card["judge_question"], objective=card["objective"],
                method=card.get("scoring", rec["method"]))
     return rec
