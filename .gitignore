@@ -29,3 +29,4 @@ lanes/
 
 # second agent (open_deep_research) run folders: outputs, never upload
 runs_odr/
+odr/open_deep_research/

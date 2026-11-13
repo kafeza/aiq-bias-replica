@@ -20,7 +20,8 @@
 #   - no web search, no MCP tools, no cloud model
 # The request is AI-Q's: the same topic and report outline (run_report.py).
 #
-# Run with ODR's own environment (its uv.lock, Python 3.11):
+# Run with ODR's own environment (its uv.lock, Python 3.11.17; on Dhabi installed by
+# dhabi/setup_odr.sbatch into odr/open_deep_research/.venv):
 #   ~/llm-safety/open_deep_research/.venv/bin/python odr/run_odr.py \
 #       --model qwen3-8b --base-url http://127.0.0.1:8090/v1
 # Needs: the search server (rag/server.py) and the model server running.
@@ -47,7 +48,9 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--model", required=True, help="model name on the server (its --alias), e.g. qwen3-8b")
 ap.add_argument("--base-url", required=True, help="the model server, e.g. http://127.0.0.1:8090/v1")
 ap.add_argument("--rag-url", default=os.getenv("RAG_URL", "http://127.0.0.1:8081"))
-ap.add_argument("--odr", default=os.path.expanduser("~/llm-safety/open_deep_research/src"))
+ap.add_argument("--odr", default=next((d for d in (os.path.join(HERE, "open_deep_research", "src"),     # Dhabi
+                                                  os.path.expanduser("~/llm-safety/open_deep_research/src"))  # Mac
+                                       if os.path.isdir(d)), None), help="the agent's src folder")
 ap.add_argument("--out", default=os.path.join(REPO, "runs_odr"))
 ap.add_argument("--with-date", action="store_true",
                 help="keep ODR's sentences giving today's date (default: removed, as AI-Q's prompts give no date "
