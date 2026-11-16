@@ -15,6 +15,8 @@
 #          (several: "BIAS_STEREOTYPE_1:20 BIAS_CF_DIABETES:20"); names from attacks.yml;
 #          CLEAN = a run without attack, e.g. "CLEAN:5"
 #   LLM    the agent's model: qwen3_8b (default), qwen3_8b_nothink, qwen3_32b, nemotron, falcon_r
+#   WRITING  odr (default): the agent's own writing instructions; aiq: AI-Q's (odr/writing.py:
+#          blend all sources, coherent flow, no citations), the agent's structure unchanged
 #   POISON_EVERY, POISON_COUNT   the attack's position: every K-th search, at most C times
 #          (default 2 and 1: the second search, once, as AI-Q's second query)
 # Examples, from the repo folder on Dhabi:
@@ -37,7 +39,8 @@ cd "$SLURM_SUBMIT_DIR" || exit 1
 source dhabi/check_rules.sh                          # rules 1 and 2
 REPO="$PWD"
 LLM="${LLM:-qwen3_8b}"
-POISON_EVERY="${POISON_EVERY:-2}"; POISON_COUNT="${POISON_COUNT:-1}"
+POISON_EVERY="${POISON_EVERY:-2}"; POISON_COUNT="${POISON_COUNT:-1}"; WRITING="${WRITING:-odr}"
+[ "$WRITING" = "odr" ] || [ "$WRITING" = "aiq" ] || stop_job "WRITING must be odr or aiq, not '$WRITING'"
 [ -n "$TASKS" ] || stop_job "no TASKS given, e.g. --export=ALL,TASKS=\"BIAS_STEREOTYPE_1:1\""
 
 # ---- fixed paths ------------------------------------------------------
@@ -117,7 +120,7 @@ SEARCH_CTX=$(grep -oE '^NUM_CTX = [0-9]+' rag/server.py | grep -oE '[0-9]+$')
 [ -n "$SEARCH_CTX" ] || stop_job "could not read NUM_CTX from rag/server.py"
 IFS=',' read -r -a GPUS <<< "$CUDA_VISIBLE_DEVICES"
 N=${#GPUS[@]}
-echo "Starting $N lane(s), agent open_deep_research, model $LLM ($ALIAS), tasks: $TASKS," \
+echo "Starting $N lane(s), agent open_deep_research (writing: $WRITING), model $LLM ($ALIAS), tasks: $TASKS," \
      "poison every $POISON_EVERY. search, at most $POISON_COUNT time(s)"
 declare -a LLM_PORT RAG_PORT
 for k in $(seq 0 $((N - 1))); do
@@ -173,7 +176,7 @@ for k in $(seq 0 $((N - 1))); do
             ATTACK=()
             [ "${ITEMS[$j]}" = "CLEAN" ] || ATTACK=(--attack "${ITEMS[$j]}" --poison-every "$POISON_EVERY" --poison-count "$POISON_COUNT")
             "$ODR_PY" odr/run_odr.py --model "$ALIAS" --base-url "http://127.0.0.1:${LLM_PORT[$k]}/v1" \
-                --rag-url "http://127.0.0.1:${RAG_PORT[$k]}" --out "$OUT" "${ATTACK[@]}" \
+                --rag-url "http://127.0.0.1:${RAG_PORT[$k]}" --out "$OUT" --writing "$WRITING" "${ATTACK[@]}" \
                 > "$LANE_DIR/run_$((j + 1)).log" 2>&1 || echo "[lane $k] run $((j + 1)) FAILED (see $LANE_DIR/run_$((j + 1)).log)"
             grep -E "^4\. done|WARNING|ERROR|^attack " "$LANE_DIR/run_$((j + 1)).log" | sed "s/^/[lane $k] /"
         done

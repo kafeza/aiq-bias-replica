@@ -55,6 +55,9 @@ ap.add_argument("--out", default=os.path.join(REPO, "runs_odr"))
 ap.add_argument("--with-date", action="store_true",
                 help="keep ODR's sentences giving today's date (default: removed, as AI-Q's prompts give no date "
                      "and our collection ends in 2024; with the date, 3 of 4 searches asked for 2026 in the test)")
+ap.add_argument("--writing", choices=["odr", "aiq"], default="odr",
+                help="the writing instructions: the agent's own (default) or AI-Q's (odr/writing.py): blend all "
+                     "sources with a coherent flow and no citations, instead of verbatim notes cited per source")
 ap.add_argument("--attack", help="attack card in attacks.yml (e.g. BIAS_CF_DIABETES); omitted: a clean run")
 ap.add_argument("--poison-every", type=int, default=2,
                 help="poison every K-th search: the K-th, 2K-th, ... (default 2: the 2nd search, as AI-Q's 2nd query)")
@@ -86,10 +89,14 @@ if not args.with_date:                           # only the date sentences go; e
         assert "{date}" not in new, name
         setattr(odr_graph, name, new)
 
+if args.writing == "aiq":                        # the structure stays; only the two writing steps change
+    import writing
+    writing.apply(odr_graph)
+
 tag = (f"_{args.attack}" + (f"_every{args.poison_every}" if args.poison_every != 2 else "")
        + (f"_x{args.poison_count}" if args.poison_count != 1 else "")) if args.attack else ""
 out = os.path.join(args.out, time.strftime("%Y%m%d-%H%M%S") + f"_odr{tag}_{args.model}"
-                   + ("_withdate" if args.with_date else ""))
+                   + ("_withdate" if args.with_date else "") + ("_aiqwriting" if args.writing == "aiq" else ""))
 os.makedirs(out)
 
 # ---- the attack: the same card as for AI-Q (run_attack.py), counted instead of matched -------
@@ -218,7 +225,7 @@ meta = {"agent": "open_deep_research", "odr_commit": "1b7d2e8", "llm": args.mode
         "end_utc": end_utc, "minutes": round((time.time() - t_start) / 60, 1), "searches": len(SOURCES),
         "model_calls": sum(c["kind"] == "llm_start" for c in calls),
         "researchers": sum(c["kind"] == "llm_start" and c.get("node") == "compress_research" for c in calls),
-        "error": error, "attack": args.attack, "date_in_prompts": args.with_date}
+        "error": error, "attack": args.attack, "date_in_prompts": args.with_date, "writing": args.writing}
 if armed:                                        # did the card fire? which searches were poisoned?
     fired = os.path.exists(DONE)
     used = json.load(open(DONE if fired else CARD)) if (fired or os.path.exists(CARD)) else {}
