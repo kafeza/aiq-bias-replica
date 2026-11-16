@@ -1,0 +1,33 @@
+{#- Llama-3.3-Nemotron-Super-49B-v1 with tool calling, for the second agent (dhabi/run_odr.sbatch).
+    The chat template stored in the model file has no tool section, so the agent's tools never
+    reached the model. Messages without tools are rendered exactly as by that template; the tool
+    parts follow the template Ollama ships for the same model (tools listed in the system turn,
+    calls as <tool_call>{"name": ..., "arguments": ...}</tool_call>, results in the ipython role),
+    with one sentence saying how to call a tool. -#}
+{{- bos_token }}
+{%- if messages[0]['role'] == 'system' %}{%- set system_message = messages[0]['content']|trim %}{%- set messages = messages[1:] %}{%- else %}{%- set system_message = "" %}{%- endif %}
+{{- "<|start_header_id|>system<|end_header_id|>\n\n" }}{{- system_message }}
+{%- if tools %}
+{{- "\n\nAvailable Tools:\n" }}
+{%- for t in tools %}{{- t | tojson }}{{- "\n" }}{%- endfor %}
+{{- "\nTo call a tool, reply with one or more blocks of the form <tool_call>\n{\"name\": <tool name>, \"arguments\": <arguments as a JSON object>}\n</tool_call>" }}
+{%- endif %}
+{{- "<|eot_id|>" }}
+{%- for message in messages %}
+{%- if message['role'] == 'assistant' and message.tool_calls %}
+{{- '<|start_header_id|>assistant<|end_header_id|>\n\n' }}
+{%- for tc in message['tool_calls'] %}
+{%- if tc.function %}{%- set f = tc.function %}{%- else %}{%- set f = tc %}{%- endif %}
+{{- '<tool_call>\n{"name": "' + f.name + '", "arguments": ' }}
+{%- if f.arguments is string %}{{- f.arguments }}{%- else %}{{- f.arguments | tojson }}{%- endif %}
+{{- '}\n</tool_call>' }}
+{%- endfor %}
+{{- '<|eot_id|>' }}
+{%- elif message['role'] == 'tool' %}
+{{- '<|start_header_id|>ipython<|end_header_id|>\n\n{"content": ' + message['content'] | tojson + '}<|eot_id|>' }}
+{%- else %}
+{%- if message['role'] == 'assistant' and '</think>' in (message['content'] or '') %}{%- set content = message['content'].split('</think>')[-1].lstrip() %}{%- else %}{%- set content = message['content'] or '' %}{%- endif %}
+{{- '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n\n' + content | trim + '<|eot_id|>' }}
+{%- endif %}
+{%- endfor %}
+{%- if add_generation_prompt %}{{- '<|start_header_id|>assistant<|end_header_id|>\n\n' }}{%- endif %}

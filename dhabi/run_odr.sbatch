@@ -50,7 +50,9 @@ case "$LLM" in      # the same files and settings as for AI-Q (run_batch.sbatch)
   falcon_r) BLOB=ac852a921c550ec9c55490c2a7aabd6706843e86b1a8cb9c31d5da908245f77e; ALIAS=falcon-h1r-7b
             EXTRA="--top-k 20 --top-p 0.95" ;;
   nemotron) BLOB=d3fc12f4480cad5060f183d6c186ca47d800509224632bb22e15791711950524; ALIAS=nemotron-super-49b
-            EXTRA="--top-p 0.95" ;;
+            # the model file's template has no tool section: the agent's tools never reached the model
+            # (16 Nov); odr/nemotron_tools.jinja adds it, messages without tools render unchanged
+            EXTRA="--top-p 0.95 --chat-template-file $REPO/odr/nemotron_tools.jinja" ;;
   qwen3_8b) BLOB=408b955510e196121c1c375201744783b5c9a43c7956d73fc78df54c66e883d6; ALIAS=qwen3-8b
             EXTRA="--top-k 20 --top-p 0.95" ;;
   qwen3_8b_nothink) BLOB=408b955510e196121c1c375201744783b5c9a43c7956d73fc78df54c66e883d6; ALIAS=qwen3-8b-nothink
