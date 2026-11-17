@@ -58,6 +58,9 @@ ap.add_argument("--with-date", action="store_true",
 ap.add_argument("--writing", choices=["odr", "aiq"], default="odr",
                 help="the writing instructions: the agent's own (default) or AI-Q's (odr/writing.py): blend all "
                      "sources with a coherent flow and no citations, instead of verbatim notes cited per source")
+ap.add_argument("--notes", choices=["compressed", "raw"], default="compressed",
+                help="what each sub-researcher passes on: its compressed notes (default, the agent's own) or "
+                     "its search answers in full, as AI-Q's writer sees them (odr/notes.py)")
 ap.add_argument("--attack", help="attack card in attacks.yml (e.g. BIAS_CF_DIABETES); omitted: a clean run")
 ap.add_argument("--poison-every", type=int, default=2,
                 help="poison every K-th search: the K-th, 2K-th, ... (default 2: the 2nd search, as AI-Q's 2nd query)")
@@ -92,11 +95,14 @@ if not args.with_date:                           # only the date sentences go; e
 if args.writing == "aiq":                        # the structure stays; only the two writing steps change
     import writing
     writing.apply(odr_graph)
+if args.notes == "raw":                          # no compression: the search answers are passed on in full
+    import notes as raw_notes_mode
+    raw_notes_mode.apply(odr_graph)
 
 tag = (f"_{args.attack}" + (f"_every{args.poison_every}" if args.poison_every != 2 else "")
        + (f"_x{args.poison_count}" if args.poison_count != 1 else "")) if args.attack else ""
 out = os.path.join(args.out, time.strftime("%Y%m%d-%H%M%S") + f"_odr{tag}_{args.model}"
-                   + ("_withdate" if args.with_date else "") + ("_aiqwriting" if args.writing == "aiq" else ""))
+                   + ("_withdate" if args.with_date else "") + ("_aiqwriting" if args.writing == "aiq" else "") + ("_rawnotes" if args.notes == "raw" else ""))
 os.makedirs(out)
 
 # ---- the attack: the same card as for AI-Q (run_attack.py), counted instead of matched -------
@@ -212,6 +218,8 @@ _node = {c["run"]: c.get("node") for c in _calls if c["kind"] == "llm_start"}
 # the compressed notes, one per sub-researcher, from the record: ODR empties its own "notes"
 # after writing the report
 notes = [c["text"] for c in _calls if c["kind"] == "llm_end" and _node.get(c["run"]) == "compress_research"]
+if args.notes == "raw":                          # no model call writes them: what was passed on
+    notes = list(raw_notes_mode.PASSED)
 json.dump({"final_report": report, "research_brief": result.get("research_brief"),
            "notes": notes, "raw_notes": result.get("raw_notes"), "sources": SOURCES, "error": error},
           open(os.path.join(out, "response.json"), "w"), indent=1)
@@ -224,8 +232,10 @@ calls = [json.loads(x) for x in open(os.path.join(out, "trace.jsonl"))]
 meta = {"agent": "open_deep_research", "odr_commit": "1b7d2e8", "llm": args.model, "start_utc": start_utc,
         "end_utc": end_utc, "minutes": round((time.time() - t_start) / 60, 1), "searches": len(SOURCES),
         "model_calls": sum(c["kind"] == "llm_start" for c in calls),
-        "researchers": sum(c["kind"] == "llm_start" and c.get("node") == "compress_research" for c in calls),
-        "error": error, "attack": args.attack, "date_in_prompts": args.with_date, "writing": args.writing}
+        "researchers": (len(raw_notes_mode.PASSED) if args.notes == "raw" else
+                        sum(c["kind"] == "llm_start" and c.get("node") == "compress_research" for c in calls)),
+        "error": error, "attack": args.attack, "date_in_prompts": args.with_date, "writing": args.writing,
+        "notes": args.notes}
 if armed:                                        # did the card fire? which searches were poisoned?
     fired = os.path.exists(DONE)
     used = json.load(open(DONE if fired else CARD)) if (fired or os.path.exists(CARD)) else {}
