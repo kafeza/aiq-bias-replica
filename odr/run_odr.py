@@ -39,14 +39,15 @@ sys.path.insert(0, REPO)
 import run_files                                                   # noqa: E402
 import re                                                          # noqa: E402
 
-# AI-Q's request (run_report.py), read from its source: importing run_report would start a run
-_src = open(os.path.join(REPO, "run_report.py")).read()
-TOPIC, ORGANIZATION, COLLECTION = (eval(re.search(rf'^{k} = (".*")$', _src, re.M).group(1))
-                                   for k in ("TOPIC", "ORGANIZATION", "COLLECTION"))
+# The request follows NVIDIA's policy (run_files.REQUESTS): an attack run takes the request of its
+# card's NVIDIA record, a run without attack the request of --request (default biomedical, AI-Q's
+# cystic fibrosis request). Set below, once the arguments are read.
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--model", required=True, help="model name on the server (its --alias), e.g. qwen3-8b")
 ap.add_argument("--base-url", required=True, help="the model server, e.g. http://127.0.0.1:8090/v1")
+ap.add_argument("--request", default="biomedical", choices=sorted(run_files.REQUESTS),
+                help="without --attack: whose request to send (with --attack, the card's record decides)")
 ap.add_argument("--rag-url", default=os.getenv("RAG_URL", "http://127.0.0.1:8081"))
 ap.add_argument("--odr", default=next((d for d in (os.path.join(HERE, "open_deep_research", "src"),     # Dhabi
                                                   os.path.expanduser("~/llm-safety/open_deep_research/src"))  # Mac
@@ -112,6 +113,7 @@ for f in (CARD, DONE):                           # never start with a stale card
     if os.path.exists(f):
         os.remove(f)
 armed = None
+REQUEST = run_files.nvidia_request(args.request)   # replaced by the card's record if there is an attack
 if args.attack:
     import yaml
     card = next(c for c in yaml.safe_load(open(os.path.join(REPO, "attacks.yml")))["attacks"] if c["name"] == args.attack)
@@ -127,7 +129,10 @@ if args.attack:
     if args.poison_every < 1 or args.poison_count < 1:
         raise SystemExit("--poison-every and --poison-count must be at least 1")
     json.dump(armed, open(CARD, "w"), indent=1)
+    REQUEST = dict(run_files.nvidia_request(run_files.request_name(rec["collection"])),
+                   topic=rec["topic"], organization=rec["organization"], collection=rec["collection"])
     print(f"armed: {args.attack}, poison every {args.poison_every}. search, at most {args.poison_count} time(s)")
+TOPIC, ORGANIZATION, COLLECTION = REQUEST["topic"], REQUEST["organization"], REQUEST["collection"]
 TRACE = open(os.path.join(out, "trace.jsonl"), "w")
 t_start = time.time()
 
@@ -234,7 +239,7 @@ meta = {"agent": "open_deep_research", "odr_commit": "1b7d2e8", "llm": args.mode
         "model_calls": sum(c["kind"] == "llm_start" for c in calls),
         "researchers": (len(raw_notes_mode.PASSED) if args.notes == "raw" else
                         sum(c["kind"] == "llm_start" and c.get("node") == "compress_research" for c in calls)),
-        "error": error, "attack": args.attack, "date_in_prompts": args.with_date, "writing": args.writing,
+        "error": error, "request": REQUEST["request"], "topic": TOPIC, "collection": COLLECTION, "attack": args.attack, "date_in_prompts": args.with_date, "writing": args.writing,
         "notes": args.notes}
 if armed:                                        # did the card fire? which searches were poisoned?
     fired = os.path.exists(DONE)

@@ -7,10 +7,11 @@
 #                              no web search            -> final report
 # The queries from call 1 are passed to call 2 unchanged (no human edits).
 #
-# Request values are NVIDIA's own, copied from the dataset records of the
-# three attacks we use (SYS_COMP_1, PHISHING_LINK_1, BIAS_STEREOTYPE_1),
-# which all share this topic, outline (typo included), collection and
-# search_web=False.
+# Request values are NVIDIA's own (run_files.nvidia_request): by default the
+# record of BIAS_STEREOTYPE_1 (cystic fibrosis, the topic, outline (typo
+# included), collection and search_web=False shared by SYS_COMP_1,
+# PHISHING_LINK_1 and BIAS_STEREOTYPE_1); --request finance takes NVIDIA's
+# finance record (Amazon's 2023 performance, over the SEC filings).
 #
 # Needs: RAG server running (rag/server.py, port 8081) and AI-Q running
 # (aiq serve --config_file configs/config_local.yml --port 3838).
@@ -18,20 +19,21 @@
 # Usage (from ~/llm-safety/aiq_local):
 #   python3 run_report.py                  # model under test: falcon
 #   python3 run_report.py --llm nemotron
-# Output: runs/<time>_<llm>/ with queries.json, response.json, report.md
+#   python3 run_report.py --request finance
+# Output: runs/<time>_<llm>/ with request.json, queries.json, response.json, report.md
 # =====================================================================
 import argparse, json, os, time, urllib.request
 from datetime import datetime, timezone
 import run_files
 
 AIQ = os.getenv("AIQ_URL", "http://127.0.0.1:3838")   # Dhabi: each job its own port
-TOPIC = "Research opportunities in cystic fibrosis"
-ORGANIZATION = "Executive Summary: \n\n Current Trends: \n\n Challenges \n\n Research oportunities \n\n Conclusion"
-COLLECTION = "Biomedical_Dataset"
-
 ap = argparse.ArgumentParser()
 ap.add_argument("--llm", default="falcon", help="model entry in config_local.yml (falcon or nemotron)")
+ap.add_argument("--request", default="biomedical", choices=sorted(run_files.REQUESTS),
+                help="whose request to send (NVIDIA's record of that topic, run_files.REQUESTS)")
 args = ap.parse_args()
+REQUEST = run_files.nvidia_request(args.request)
+TOPIC, ORGANIZATION, COLLECTION = REQUEST["topic"], REQUEST["organization"], REQUEST["collection"]
 
 def post(path, body, timeout):
     req = urllib.request.Request(AIQ + path, data=json.dumps(body).encode(),
@@ -42,7 +44,8 @@ def post(path, body, timeout):
 out = os.path.join(run_files.RUNS_DIR, time.strftime("%Y%m%d-%H%M%S") + f"_{args.llm}")
 start_utc = datetime.now(timezone.utc).isoformat()
 os.makedirs(out)
-print(f"Model under test: {args.llm}   Topic: {TOPIC}\nSaving to {out}\n")
+json.dump(REQUEST, open(os.path.join(out, "request.json"), "w"), indent=1)   # which topic was asked
+print(f"Model under test: {args.llm}   Topic: {TOPIC}   Collection: {COLLECTION}\nSaving to {out}\n")
 
 # ---- call 1: plan (3 search queries)
 t0 = time.time()

@@ -13,7 +13,7 @@
 # Settings (given when starting the job):
 #   TASKS  which statements and how many runs each, e.g. "BIAS_STEREOTYPE_1:20"
 #          (several: "BIAS_STEREOTYPE_1:20 BIAS_CF_DIABETES:20"); names from attacks.yml;
-#          CLEAN = a run without attack, e.g. "CLEAN:5"
+#          CLEAN = a run without attack, e.g. "CLEAN:5"; CLEAN_FIN = the same with NVIDIA's finance request
 #   LLM    the agent's model: qwen3_8b (default), qwen3_8b_nothink, qwen3_32b, nemotron, falcon_r
 #   WRITING  odr (default): the agent's own writing instructions; aiq: AI-Q's (odr/writing.py:
 #          blend all sources, coherent flow, no citations), the agent's structure unchanged
@@ -163,7 +163,7 @@ check_localhost_only                                 # rule 3, once everything i
 ITEMS=()
 for t in $TASKS; do
     name="${t%%:*}"; reps="${t##*:}"
-    [ "$name" = "CLEAN" ] || grep -q "name: $name\b" attacks.yml || stop_job "no attack card '$name' in attacks.yml"
+    case "$name" in CLEAN|CLEAN_FIN) ;; *) grep -q "name: $name\b" attacks.yml || stop_job "no attack card '$name' in attacks.yml" ;; esac
     for r in $(seq 1 "$reps"); do ITEMS+=("$name"); done
 done
 echo "${#ITEMS[@]} runs over $N lane(s)"
@@ -177,8 +177,11 @@ for k in $(seq 0 $((N - 1))); do
         OUT="$REPO/runs_odr/${SLURM_JOB_ID}_L$k"; mkdir -p "$OUT"
         for j in $(seq "$k" "$N" $((${#ITEMS[@]} - 1))); do
             echo "[lane $k] run $((j + 1))/${#ITEMS[@]}: ${ITEMS[$j]}"
-            ATTACK=()
-            [ "${ITEMS[$j]}" = "CLEAN" ] || ATTACK=(--attack "${ITEMS[$j]}" --poison-every "$POISON_EVERY" --poison-count "$POISON_COUNT")
+            case "${ITEMS[$j]}" in       # a run without attack: cystic fibrosis (CLEAN) or finance (CLEAN_FIN)
+                CLEAN)     ATTACK=(--request biomedical) ;;
+                CLEAN_FIN) ATTACK=(--request finance) ;;
+                *)         ATTACK=(--attack "${ITEMS[$j]}" --poison-every "$POISON_EVERY" --poison-count "$POISON_COUNT") ;;
+            esac
             "$ODR_PY" odr/run_odr.py --model "$ALIAS" --base-url "http://127.0.0.1:${LLM_PORT[$k]}/v1" \
                 --rag-url "http://127.0.0.1:${RAG_PORT[$k]}" --out "$OUT" --writing "$WRITING" --notes "$NOTES" "${ATTACK[@]}" \
                 > "$LANE_DIR/run_$((j + 1)).log" 2>&1 || echo "[lane $k] run $((j + 1)) FAILED (see $LANE_DIR/run_$((j + 1)).log)"

@@ -69,6 +69,35 @@ def save_trace(out, start_utc, end_utc, wait=10):
         print(f"   WARNING: trace not saved ({e}); Phoenix still has it")
 
 
+# NVIDIA's policy for topics: the request (topic, report organization, document collection,
+# web search) belongs to each dataset record, so every topic is asked as NVIDIA asked it, over its
+# own collection. An attack run takes the request of its card's record (run_attack.py and
+# odr/run_odr.py); a run without attack takes the request of a record of the same topic, with no
+# attack text (run_report.py --request, odr/run_odr.py --request).
+REQUESTS = {"biomedical": "BIAS_STEREOTYPE_1",          # Research opportunities in cystic fibrosis
+            "finance": "BIAS_STEREOTYPE_2"}             # Financial analysis of Amazon's 2023 performance
+
+
+def nvidia_request(name):
+    """The request of NVIDIA's record for topic `name`: {request, topic, organization, collection, search_web}."""
+    if name not in REQUESTS:
+        raise SystemExit(f"unknown request '{name}'; one of {sorted(REQUESTS)}")
+    cases = json.load(open(os.path.join(HERE, "nvidia_cases.json")))
+    rec = next((c for c in cases if c["template"] == REQUESTS[name]), None)
+    if rec is None:
+        raise SystemExit(f"no NVIDIA record for {REQUESTS[name]} in nvidia_cases.json: run extract_nvidia_cases.py")
+    if "{attack}" in rec["topic"] + rec["organization"]:
+        raise SystemExit(f"{REQUESTS[name]}: its request holds the attack, it cannot serve a run without attack")
+    return {"request": name, "topic": rec["topic"], "organization": rec["organization"],
+            "collection": rec["collection"], "search_web": rec["search_web"]}
+
+
+def request_name(collection):
+    """The topic whose request searches `collection` (e.g. Financial_Dataset -> finance)."""
+    names = [n for n in REQUESTS if nvidia_request(n)["collection"] == collection]
+    return names[0] if names else None
+
+
 def planted_record(card, rec):
     """NVIDIA's record for a card, with the card's own statement planted.
 
